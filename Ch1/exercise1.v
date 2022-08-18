@@ -16,6 +16,24 @@ Definition andb3 (b1:bool) (b2:bool) (b3:bool) : bool :=
   | false => false
   end.
 
+Definition andb (lhs rhs : bool) : bool :=
+  match lhs with
+  | true => rhs
+  | false => false
+  end.
+
+Definition orb (lhs rhs : bool) : bool :=
+  match lhs with
+  | true => true
+  | false => rhs
+  end.
+
+Definition negb (b : bool) : bool :=
+  match b with
+  | true => false
+  | false => true
+  end.
+
 Example test_andb31: (andb3 true true true) = true.
 Proof. simpl. reflexivity. Qed.
 
@@ -139,4 +157,158 @@ Proof.
   reflexivity.
 Qed.
 
-Check mult_n_1.
+(* Helper theorems. *)
+Theorem andb_commutative : forall b c,
+  andb b c = andb c b.
+Proof.
+  intros b c. destruct b eqn: Eb.
+  - destruct c eqn: Ec.
+    + reflexivity.
+    + reflexivity.
+  - destruct c eqn: Ec.
+    + reflexivity.
+    + reflexivity.
+Qed.
+
+Theorem andb3_exchange : forall b c d,
+  andb (andb b c) d = andb (andb b d) c.
+Proof.
+  intros b c d. destruct b eqn:Eb.
+  - destruct c eqn:Ec.
+    { destruct d eqn:Ed.
+      - reflexivity.
+      - reflexivity. }
+    { destruct d eqn:Ed.
+      - reflexivity.
+      - reflexivity. }
+  - destruct c eqn:Ec.
+    { destruct d eqn:Ed.
+      - reflexivity.
+      - reflexivity. }
+    { destruct d eqn:Ed.
+      - reflexivity.
+      - reflexivity. }
+Qed.
+
+Theorem andb_true_elim2 : forall b c : bool,
+  andb b c = true -> c = true.
+Proof.
+  intros b c. destruct b eqn: Eb.
+  - destruct c eqn: Ec.
+    + reflexivity.
+    + simpl. discriminate.
+  - destruct c eqn: Ec.
+    + simpl. discriminate.
+    + simpl. discriminate.
+Qed.
+
+Notation "x =? y" := (eqb x y) (at level 70) : nat_scope.
+Notation "x <=? y" := (leb x y) (at level 70) : nat_scope.
+
+Theorem zero_nbeq_plus_1 : forall n : nat,
+  0 =? (n + 1) = false.
+Proof.
+  intros [|n].
+  - reflexivity.
+  - reflexivity.
+Qed.
+
+
+(* Exercise optional: ill-formed recursion. *)
+(* Fixpoint infinite (n : nat) : nat :=
+  match n with
+  | O => S (infinite O)
+  | S n' => S (infinite n')
+  end. *)
+
+Theorem identity_fn_applied_twice :
+  forall (f : bool -> bool),
+  (forall (x : bool), f x = x) ->
+  forall (b : bool), f (f(b)) = b.
+Proof.
+  intros H0 H1.
+  intros b.
+  rewrite -> H1.
+  rewrite -> H1.
+  reflexivity.
+Qed.
+
+Lemma negb_involutive : forall b : bool,
+  negb (negb b) = b.
+Proof.
+  intros b. destruct b.
+  - reflexivity.
+  - reflexivity.
+  Qed.
+
+Theorem negation_fn_applied_twice:
+  forall (f : bool -> bool),
+  (forall (x : bool), f x = negb x) ->
+  forall (b : bool), f (f(b)) = b.
+Proof.
+  intros H0 H1.
+  intros b.
+  rewrite -> H1. rewrite -> H1. apply negb_involutive.
+Qed.
+
+(* Not the best way. *)
+Theorem andb_eq_orb :
+  forall(b c : bool),
+  (andb b c = orb b c) ->
+  b = c.
+Proof.
+  intros b c.
+  destruct b.
+  - destruct c.
+    + reflexivity.
+    + simpl. discriminate.
+  - destruct c.
+    + simpl. discriminate.
+    + reflexivity.
+Qed.
+
+(** **** Exercise: 3 stars, optional (andb_eq_orb)  *)
+(** Prove the following theorem.  (Hint: This one can be a bit tricky,
+    depending on how you approach it.  You will probably need both
+    [destruct] and [rewrite], but destructing everything in sight is
+    not the best way.) *)
+Theorem andb_eq_orb_2 :
+  forall(b c : bool),
+  (andb b c = orb b c) ->
+  b = c.
+Proof.
+  intros b c.
+  destruct b.
+  - simpl. intros H. rewrite <- H. reflexivity.
+  - simpl. intros H. rewrite <- H. reflexivity.
+Qed.
+
+(** **** Exercise: 3 stars, standard (binary) *)
+(** Complete the definitions below of an increment function incr for binary numbers, 
+   and a function bin_to_nat to convert binary numbers to unary numbers. *)
+Inductive bin : Type :=
+  | Z
+  | B0 (n : bin)
+  | B1 (n : bin).
+
+Fixpoint incr (m : bin) : bin :=
+  match m with 
+  | Z => B1 Z
+  | B1 Z => B0 (B1 Z)
+  | B0 z' => B1 z'
+  | B1 z' => B0 (incr z') 
+  end.
+
+Compute incr (B1 (B1 (B1 Z))).
+
+Fixpoint bin_to_nat (m : bin) : nat :=
+  match m with
+  | Z => O
+  | B1 Z => S O
+  | B0 z' => S (S O) * bin_to_nat (z')
+  | B1 z' => S (S O) * bin_to_nat (z') + S O
+  end.
+
+Compute bin_to_nat (incr (incr (B1 Z))).
+Compute 2 + bin_to_nat (B1 Z).
+Compute bin_to_nat (incr (B1 Z)) = 1 + bin_to_nat (B1 Z).
