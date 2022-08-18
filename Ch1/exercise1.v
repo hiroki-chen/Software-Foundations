@@ -34,6 +34,13 @@ Definition negb (b : bool) : bool :=
   | false => true
   end.
 
+Fixpoint even (n : nat) : bool :=
+  match n with
+  | O => true
+  | S O => false
+  | S (S n') => even n'
+  end.
+
 Example test_andb31: (andb3 true true true) = true.
 Proof. simpl. reflexivity. Qed.
 
