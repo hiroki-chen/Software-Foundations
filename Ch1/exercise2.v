@@ -102,8 +102,6 @@ Proof.
   - rewrite H. rewrite -> negb_involutive. reflexivity.
 Qed.
 
-Check even_S.
-
 (** **** Exercise: 3 stars, standard, especially useful (mul_comm) *)
 (** Use assert to help prove add_shuffle3. You don't need to use induction yet. *)
 Theorem add_shuffle3 : forall n m p : nat,
@@ -129,7 +127,6 @@ Qed.
 (** **** Exercise: 2 stars, standard, optional (plus_leb_compat_l) *)
 (** If a hypothesis has the form H: P → a = b, then rewrite H will rewrite a to b in the goal,
 and add P as a new subgoal. Use that in the inductive step of this exercise. *)
-Check leb.
 Theorem plus_leb_compat_l : forall n m p : nat,
   n <=? m = true -> (p + n) <=? (p + m) = true.
 Proof.
@@ -257,7 +254,7 @@ Lemma bin_to_nat_to_S: forall b : bin,
   bin_to_nat (B1 b) = S (bin_to_nat (B0 b)).
 Proof.
   intros b.
-  simpl. rewrite -> add_0_r. rewrite -> plus_n_Sm.
+  simpl. rewrite -> plus_n_Sm.
   replace (S (bin_to_nat b)) with (bin_to_nat b + 1).
     - rewrite add_assoc. reflexivity.
     - apply add_one_right.
@@ -274,8 +271,7 @@ Proof.
     + apply bin_to_nat_to_S.
     + reflexivity.
   - replace (bin_to_nat(incr (B1 b'))) with (bin_to_nat (B0 (incr b'))).
-    + simpl. rewrite -> IHb'.  rewrite plus_Sn_m. rewrite -> add_0_r.
-      rewrite <- plus_n_Sm. rewrite -> add_one_right. rewrite -> add_0_r. reflexivity.
+    + simpl. rewrite -> IHb'. rewrite plus_Sn_m. rewrite <- plus_n_Sm. reflexivity.
     + destruct b'.
       * reflexivity.
       * reflexivity.
@@ -353,7 +349,7 @@ Theorem bin_nat_bin_fails : forall b : bin,
 Proof.
   intros b. destruct b.
   - reflexivity.
-  - simpl. rewrite -> add_0_r. destruct b.
+  - simpl. destruct b.
     + simpl. (* B0 Z => Z *)
 Abort.
 
@@ -400,11 +396,10 @@ Proof.
   intros b. induction b as [ | b' | b'].
   - reflexivity.
   (* Construct the term appearing in IHb'. *)
-  - simpl. rewrite -> add_0_r. rewrite <- double_plus.
+  - simpl. rewrite <- double_plus.
     rewrite -> double_bin_exchange. rewrite -> IHb'.
     reflexivity.
-  - simpl. rewrite -> add_0_r. rewrite <- double_plus. rewrite <- IHb'.
-    rewrite <- incr_double. rewrite <- plus_n_Sm. rewrite -> add_0_r. simpl.
+  - simpl. rewrite <- double_plus. rewrite <- IHb'.
+    rewrite <- incr_double.
     rewrite double_bin_exchange. reflexivity.
 Qed.
-
