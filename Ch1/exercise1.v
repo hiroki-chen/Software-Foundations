@@ -41,6 +41,8 @@ Fixpoint even (n : nat) : bool :=
   | S (S n') => even n'
   end.
 
+Definition odd (n : nat) : bool := negb (even n).
+
 Example test_andb31: (andb3 true true true) = true.
 Proof. simpl. reflexivity. Qed.
 
