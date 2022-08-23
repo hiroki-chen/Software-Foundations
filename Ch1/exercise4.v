@@ -197,6 +197,16 @@ Proof.
   - simpl. rewrite <- IHl. rewrite -> map_f_assoc. reflexivity.
 Qed.
 
+Fixpoint nth_error {X : Type} (l : list X) (n : nat)
+                   : option X :=
+  match l with
+  | nil => None
+  | a :: l' => match n with
+               | O => Some a
+               | S n' => nth_error l' n'
+               end
+  end.
+
 (** **** Exercise: 2 stars, standard, especially useful (flat_map) *)
 (* The function map maps a list X to a list Y using a function of type X → Y. We can define a similar function,
 flat_map, which maps a list X to a list Y using a function f of type X → list Y. Your definition should work by
