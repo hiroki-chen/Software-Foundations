@@ -167,3 +167,113 @@ Proof.
   rewrite H. reflexivity.
 Qed.
 
+(* In fact, this is injection. *)
+Lemma pair_eq : forall X Y (x1 x2: X) (y1 y2 : Y),
+  (x1, y1) = (x2, y2) ->
+  x1 = x2 /\ y1 = y2.
+Proof.
+  intros. injection H as H1 H2.
+  split.
+  - apply H1.
+  - apply H2.
+Qed.
+
+Theorem combine_split : forall X Y (l : list (X * Y)) l1 l2,
+  split l = (l1, l2) ->
+  combine l1 l2 = l.
+Proof.
+  intros X Y l. induction l as [| n l' IHl].
+  - intros. simpl in H. apply pair_eq in H.
+    destruct H. rewrite <- H. rewrite <- H0. reflexivity.
+  - destruct n as [n1 n2]. simpl. destruct (split l').
+    + simpl. intros l1 l2 H.
+      apply pair_eq in H. destruct H. rewrite <- H. rewrite <- H0.
+      assert(H' : combine x y = l').
+      {
+        apply IHl. reflexivity.
+      }
+      rewrite <- H'. reflexivity.
+Qed.
+
+Definition sillyfun1 (n : nat) : bool :=
+  if n =? 3 then true
+  else if n =? 5 then true
+  else false.
+
+  Theorem sillyfun1_odd_FAILED : forall (n : nat),
+  sillyfun1 n = true ->
+  odd n = true.
+Proof.
+  intros n eq. unfold sillyfun1 in eq.
+  destruct (n =? 3) eqn: Heqn3.
+  - apply eqb_true in Heqn3. rewrite Heqn3. reflexivity.
+  - destruct (n =? 5) eqn : Heqn5.
+    + apply eqb_true in Heqn5. rewrite Heqn5. reflexivity.
+    + discriminate eq.
+Qed.
+
+(** **** Exercise: 2 stars, standard (destruct_eqn_practice) *)
+Theorem bool_fn_applied_thrice : forall (f : bool -> bool) (b : bool),
+  f (f (f b)) = f b.
+Proof.
+  intros. destruct b.
+  - destruct (f true) eqn: H1.
+    + rewrite H1. apply H1.
+    + destruct (f false) eqn: H2.
+      * apply H1.
+      * apply H2.
+  - destruct (f false) eqn: H1.
+    +  destruct (f true) eqn : H2.
+      * apply H2.
+      * apply H1.
+    + rewrite H1. apply H1.
+Qed.
+
+(** **** Exercise: 3 stars, standard (eqb_sym) *)
+Theorem eqb_sym : forall (n m : nat),
+  (n =? m) = (m =? n).
+Proof.
+  intros n. induction n as [| n' H].
+  - intros m. destruct m.
+    * reflexivity.
+    * reflexivity.
+  - intros m. destruct m.
+    * reflexivity.
+    * simpl. apply H.
+Qed.
+
+
+(** **** Exercise: 3 stars, standard, optional (eqb_trans) *)
+Theorem eqb_trans : forall n m p,
+  n =? m = true ->
+  m =? p = true ->
+  n =? p = true.
+Proof.
+  intros. apply eqb_true in H. apply eqb_true in H0.
+  rewrite H. rewrite <- H0. apply eqb_refl.
+Qed.
+
+
+(** **** Exercise: 3 stars, advanced (split_combine) *)
+(* We proved, in an exercise above, that combine is the inverse of split. Complete the definition of split_combine_statement below with a property that
+states that split is the inverse of combine. Then, prove that the property
+holds. *)
+(* Hint: Take a look at the definition of combine in Poly. Your property will
+need to account for the behavior of combine in its base cases, which possibly
+drop some list elements. *)
+Definition split_combine_statement : Prop :=
+  forall (X: Type) (l1 l2: list X),
+  length l1 = length l2 ->
+  split (combine l1 l2) = (l1, l2).
+
+Theorem split_combine : split_combine_statement.
+Proof.
+  intros X l1. induction l1 as [| n l1' H].
+  - intros. simpl. destruct l2.
+    + reflexivity.
+    + inversion H.
+  - intros. destruct l2.
+    + simpl. inversion H0.
+    + inversion H0. apply H in H2. simpl. rewrite H2. simpl. reflexivity.
+Qed.
+  
