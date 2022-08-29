@@ -276,4 +276,20 @@ Proof.
     + simpl. inversion H0.
     + inversion H0. apply H in H2. simpl. rewrite H2. simpl. reflexivity.
 Qed.
-  
+
+(*Sometimes you have a hypothesis that can't be true unless other things
+are also true. We can use inversion to discover other necessary
+conditions for a hypothesis to be true.*)
+
+(** **** Exercise: 3 stars, advanced (filter_exercise) *)
+Theorem filter_exercise : forall (X : Type) (test : X -> bool)
+                                 (x : X) (l lf : list X),
+  filter test l = x :: lf ->
+  test x = true.
+Proof.
+  intros X test x l lf. induction l as [|n l' IHl].
+  - intros H. simpl in H. discriminate.
+  - intros H. simpl in H. destruct (test n) eqn: H'.
+    + inversion H. rewrite H1 in H'. apply H'.
+    + inversion H. apply IHl. apply H.
+Qed.
