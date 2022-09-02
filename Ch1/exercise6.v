@@ -247,6 +247,8 @@ Proof.
   reflexivity.
 Qed.
 
+Definition Even x := exists n: nat, x = double n.
+
 (** **** Exercise: 1 star, standard, especially useful (dist_not_exists) *)
 (* Prove that "P holds for all x" implies "there is no x for which P does not
 hold." (Hint: destruct H as [x E] works on existential assumptions!) *)
@@ -403,4 +405,212 @@ Proof.
   destruct (odd n).
   - discriminate.
   - apply H.
+Qed.
+
+Theorem add_comm3 : forall x y z,
+  x + (y + z) = (z + y) + x.
+Proof.
+  intros.
+  rewrite add_comm.
+  rewrite (add_comm y z).
+  reflexivity.
+Qed.
+
+Theorem in_not_nil : forall A (x : A) (l : list A),
+  In x l -> l <> [].
+Proof.
+  intros. unfold not.
+  intros. rewrite H0 in H.
+  simpl in H. apply H.
+Qed.
+
+(** **** Exercise: 4 stars, standard (tr_rev_correct) *)
+(* One problem with the definition of the list-reversing function rev
+that we have is that it performs a call to app on each step; running
+app takes time asymptotically linear in the size of the list, which
+means that rev is asymptotically quadratic. We can improve this with
+the following definitions: *)
+Fixpoint rev_append {X} (l1 l2 : list X) : list X :=
+  match l1 with
+  | [] => l2
+  | x :: l1' => rev_append l1' (x :: l2)
+  end.
+
+Definition tr_rev {X} (l : list X) : list X :=
+  rev_append l [].
+
+Axiom functional_extensionality : forall (X Y : Type) (f g : X -> Y),
+(forall x : X, f x = g x) -> f = g.
+
+Compute (rev_append [1;2;3] [4;5;6]).
+
+Lemma rev_append_rev_origin : forall X (l1 l2 : list X),
+  rev_append l1 l2 = rev l1 ++ l2.
+Proof.
+  intros X l1. induction l1 as [| n' l' IHl]; intros.
+  - reflexivity.
+  - simpl. rewrite <- app_assoc. simpl. apply IHl.
+Qed.
+
+Theorem tr_rev_correct : forall X, @tr_rev X = @rev X.
+Proof.
+  intros.
+  apply functional_extensionality.
+  induction x as [| x' l' IHx].
+  - unfold tr_rev. reflexivity.
+  - unfold tr_rev. simpl. apply rev_append_rev_origin.
+Qed.
+
+Lemma even_double : forall k,
+  even (double k) = true.
+Proof.
+  intros. induction k as [| k' H].
+  - reflexivity.
+  - simpl. rewrite H. reflexivity.
+Qed.
+
+(** **** Exercise: 3 stars, standard (even_double_conv) *)
+Lemma even_double_conv : forall n, exists k,
+  n = if even n then double k else S (double k).
+Proof.
+  intros. induction n as [| n' H].
+  - simpl. exists 0. reflexivity.
+  - rewrite even_S. destruct H.
+    destruct (even n').
+    + simpl. exists x. rewrite H. reflexivity.
+    + simpl. exists (S x). rewrite double_incr. rewrite H. reflexivity.
+Qed.
+
+Theorem even_bool_prop : forall n,
+  even n = true <-> Even n.
+Proof.
+  intros. split.
+  (* Apply the theorem on n, so we obtain some k. *)
+  - intros. destruct (even_double_conv n) as [k Hk].
+    rewrite Hk. rewrite H. unfold Even. exists k. reflexivity.
+  - unfold Even. intros. destruct H. rewrite H. apply even_double.
+Qed.
+
+Theorem eqb_eq : forall n m : nat,
+  n =? m = true <-> n = m.
+Proof.
+  intros. split.
+  - apply eqb_true.
+  - intros. rewrite H. rewrite eqb_refl. reflexivity.
+Qed.
+
+Example not_even_1001 : ~(Even 1001).
+Proof.
+  rewrite <- even_bool_prop.
+  unfold not.
+  intros.
+  discriminate.
+Qed.
+
+
+(** **** Exercise: 2 stars, standard (logical_connectives) *)
+(* The following theorems relate the propositional connectives studied in this chapter
+to the corresponding boolean operations. *)
+Theorem andb_true_iff : forall b1 b2 : bool,
+  andb b1 b2 = true <-> b1 = true /\ b2 = true.
+Proof.
+  intros. split.
+  - intros. destruct b1.
+    + destruct b2.
+      * split. reflexivity. reflexivity.
+      * split. discriminate. discriminate.
+    + destruct b2.
+      * split. discriminate. discriminate.
+      * split. discriminate. discriminate.
+  - intros [H1 H2]. rewrite H1. rewrite H2. reflexivity.
+Qed.
+
+
+Theorem orb_ture_iff : forall b1 b2 : bool,
+  orb b1 b2 = true <-> b1 = true \/ b2 = true.
+Proof.
+  intros. split.
+  - intros. destruct b1.
+    + destruct b2.
+      * left. reflexivity.
+      * left. reflexivity.
+    + destruct b2.
+      * right. reflexivity.
+      * discriminate.
+  - intros [H1 | H2].
+    + unfold orb. rewrite H1. reflexivity.
+    + unfold orb. rewrite H2. destruct b1.
+      * reflexivity.
+      * reflexivity.
+Qed.
+
+(** **** Exercise: 1 star, standard (eqb_neq) *)
+(* The following theorem is an alternate "negative" formulation of eqb_eq
+that is more convenient in certain situations.
+(We'll see examples in later chapters.) Hint: not_true_iff_false. *)
+Theorem eqb_neq : forall x y : nat,
+  x =? y = false <-> x <> y.
+Proof.
+  intros. unfold not. split.
+  - intros. rewrite H0 in H. rewrite eqb_refl in H. discriminate.
+  - intros. apply not_true_iff_false. unfold not. intros.
+    apply eqb_eq in H0. apply H. apply H0.
+Qed.
+
+(** **** Exercise: 3 stars, standard (eqb_list) *)
+(* Given a boolean operator eqb for testing equality of elements of some type A,
+we can define a function eqb_list for testing equality of lists with elements in A.
+Complete the definition of the eqb_list function below. To make sure that your
+definition is correct, prove the lemma eqb_list_true_iff. *)
+Fixpoint eqb_list {A : Type} (eqb : A -> A -> bool) (l1 l2 : list A) : bool :=
+  match l1, l2 with
+  | [], [] => true
+  | [], _ => false
+  | _, [] => false
+  | (n1 :: l1'), (n2 :: l2') => andb (eqb n1 n2) (eqb_list eqb l1' l2')
+  end.
+
+Theorem eqb_list_true_iff :
+  forall A (eqb : A -> A -> bool),
+    (forall a1 a2, eqb a1 a2 = true <-> a1 = a2) ->
+    forall l1 l2, eqb_list eqb l1 l2 = true <-> l1 = l2.
+Proof.
+  intros A eqb H. induction l1.
+  - destruct l2.
+    + simpl. split. intros. reflexivity. intros. reflexivity.
+    + simpl. split. intros. discriminate. intros. discriminate.
+  - destruct l2.
+    + simpl. split. intros. discriminate. intros. discriminate.
+    + (* non-trivial. *)
+      simpl. split. intros.
+      * apply andb_true_iff in H0. destruct H0 as [H1 H2].
+        apply H in H1. apply IHl1 in H2. rewrite H1, H2. reflexivity.
+      * intros. injection H0 as H'. apply andb_true_iff. split.
+        apply H. apply H'. apply IHl1. apply H0.
+Qed.
+
+(** **** Exercise: 2 stars, standard, especially useful (All_forallb) *)
+(* Prove the theorem below, which relates forallb, from the exercise forall_exists_challenge
+in chapter Tactics, to the All property defined above. *)
+Fixpoint forallb {X : Type} (test : X -> bool) (l : list X) : bool :=
+  match l with
+  | [] => true
+  | n :: l' => andb (test n) (forallb test l')
+  end.
+
+Theorem forallb_true_iff : forall X test (l : list X),
+  forallb test l = true <-> All (fun x => test x = true) l.
+Proof.
+  intros. split.
+  - intros. induction l.
+    + reflexivity.
+    + simpl in H. apply andb_true_iff in H. destruct H as [H1 H2].
+      simpl. split.
+      * apply H1.
+      * apply IHl in H2. apply H2.
+  - intros. induction l.
+    + reflexivity.
+    + simpl. apply andb_true_iff. split.
+      * simpl in H. destruct H as [H _]. apply H.
+      * simpl in H. destruct H as [_ H]. apply IHl in H. apply H.
 Qed.
