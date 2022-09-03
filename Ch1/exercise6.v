@@ -78,7 +78,7 @@ Lemma factor_is_O:
   forall n m : nat, n = 0 \/ m = 0 -> n * m = 0.
 Proof.
   (* This pattern implicitly does case analysis on
-     n = 0 ∨ m = 0 *)
+     n = 0 \/ m = 0 *)
   intros n m [Hn | Hm].
   - (* Here, n = 0 *)
     rewrite Hn. reflexivity.
@@ -162,12 +162,16 @@ conjunction of the negations." There is a corresponding law
 de_morgan_not_and_not that we will return to at the end of thi
  chapter. *)
 Theorem de_morgan_not_or : forall (P Q : Prop),
-    ~ (P \/ Q) -> ~P /\ ~Q.
+    ~ (P \/ Q) <-> ~P /\ ~Q.
 Proof.
   unfold not. intros.
   split.
-  - intros. apply H. apply or_intro_l. apply H0.
-  - intros. apply H. apply or_intro_r. apply H0.
+  - split.
+    + intros. apply H. apply or_intro_l. apply H0.
+    + intros. apply H. apply or_intro_r. apply H0.
+  - intros. destruct H0.
+    + destruct H. apply H. apply H0.
+    + destruct H. apply H1. apply H0.
 Qed.
 
 Theorem iff_sym : forall P Q : Prop,
@@ -613,4 +617,99 @@ Proof.
     + simpl. apply andb_true_iff. split.
       * simpl in H. destruct H as [H _]. apply H.
       * simpl in H. destruct H as [_ H]. apply IHl in H. apply H.
+Qed.
+
+Theorem de_facto_not_trivial : forall P b,
+  (P <-> b = true) -> P \/ ~P.
+Proof.
+  intros P [] H.
+  - left. rewrite H. reflexivity.
+  - right. rewrite H. discriminate.
+Qed.
+
+Definition excluded_middle := forall P : Prop,
+  P \/ ~ P.
+
+Lemma helper : forall P,
+  ~(P /\ ~P).
+Proof.
+  unfold not. intros P [H1 H2].
+  apply H2. apply H1.
+Qed.
+
+(** **** Exercise: 3 stars, standard (excluded_middle_irrefutable) *)
+Theorem excluded_middle_irrefutable : forall P : Prop,
+  ~~(P \/ ~P).
+Proof.
+  intros P H.
+  apply de_morgan_not_or in H. apply helper in H. apply H.
+Qed.
+
+(** **** Exercise: 3 stars, advanced (not_exists_dist) *)
+(* It is a theorem of classical logic that the following two assertions are equivalent:
+    ~ (∃ x, ~ P x)
+    forall x, P x
+The dist_not_exists theorem above proves one side of this equivalence. Interestingly, the
+other direction cannot be proved in constructive logic. Your job is to show that it is implied
+by the excluded middle. *)
+Theorem not_exists_dist:
+  excluded_middle ->
+  forall (X : Type) (P : X -> Prop),
+    ~ (exists x, ~ P x) -> (forall x, P x).
+Proof.
+  intros EM X P. unfold not. intros.
+  destruct (EM (P x)) as [H1 | H2]. (* Can destruct the whole proposition. *)
+  - apply H1.
+  - apply ex_falso_quodlibet. apply H. exists x. apply H2.
+Qed.
+
+Definition peirce := forall P Q: Prop,
+  ((P -> Q) -> P) -> P.
+Definition double_negation_elimination := forall P:Prop,
+  ~~P -> P.
+Definition de_morgan_not_and_not := forall P Q:Prop,
+  ~(~P /\ ~ Q) -> P \/ Q.
+Definition implies_to_or := forall P Q:Prop,
+  (P -> Q) -> (~ P \/ Q).
+
+Theorem em_imples_peirce :
+  excluded_middle -> peirce.
+Proof.
+  unfold excluded_middle, peirce, not.
+  intros. destruct (H P).
+  - apply H1.
+  - apply H0. intros. apply H1 in H2. apply ex_falso_quodlibet. apply H2.
+Qed.
+
+Theorem peirce_imples_dne:
+  peirce -> double_negation_elimination.
+Proof.
+  unfold peirce, double_negation_elimination, not.
+  intros. apply (H P False). (* Remember to apply with arguments! *)
+  intros. apply H0 in H1. apply ex_falso_quodlibet. apply H1.
+Qed.
+
+Theorem dne_implies_dm :
+  double_negation_elimination -> de_morgan_not_and_not.
+Proof.
+  unfold double_negation_elimination, de_morgan_not_and_not, not.
+  intros. apply H. intros. apply H1.
+  left. apply H. intros. apply H0. split. apply H2. intros. apply H1. right. apply H3.
+Qed.
+
+Theorem dm_implies_implies_to_or :
+  de_morgan_not_and_not -> implies_to_or.
+Proof.
+  unfold de_morgan_not_and_not, implies_to_or, not.
+  intros.
+  apply H. intros. destruct H1.
+  apply H1. intros. apply H2. apply H0. apply H3.
+Qed.
+
+Theorem implies_to_or_implies_em :
+  implies_to_or -> excluded_middle.
+Proof.
+  unfold implies_to_or, excluded_middle, not.
+  intros.
+  apply or_commut. apply H. intros. apply H0.
 Qed.
