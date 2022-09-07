@@ -226,3 +226,209 @@ Proof.
   (* trivial. *)
   rewrite <- double_plus. apply ev_double.
 Qed.
+
+Module Playground.
+Inductive le : nat -> nat -> Prop :=
+	| le_n (n : nat) : le n n 
+	| le_S (n m : nat) (H : le n m) : le n (S m).
+
+Notation "n <= m " := (le n m).
+
+Theorem test_le_1 : 3 <= 3.
+Proof.
+  apply le_n.
+Qed.
+
+Theorem test_l2_2: 3 <= 6.
+Proof.
+  apply le_S.
+  apply le_S.
+  apply le_S.
+  apply le_n.
+Qed.
+
+Theorem test_le_3 :
+  (2 <= 1) -> 2 + 2 = 5.
+Proof.
+  intros.
+  inversion H.
+  inversion H2.
+Qed.
+
+Definition lt (n m : nat) := le (S n) m.
+
+Notation "m < n" := (lt m n).
+End Playground.
+
+(** **** Exercise: 2 stars, standard, optional (total_relation) *)
+(* Define an inductive binary relation total_relation that holds between every pair of natural numbers. *)
+Inductive total_relation : nat -> nat -> Prop := total n m : total_relation n m.
+
+
+Theorem total_relation_is_total : forall n m, total_relation n m.
+Proof.
+  intros. apply total.
+Qed.
+
+
+(** **** Exercise: 2 stars, standard, optional (empty_relation) *)
+(* Define an inductive binary relation empty_relation (on numbers) that never holds. *)
+Inductive empty_relation : nat -> nat -> Prop :=.
+
+Theorem empty_relation_is_empty : forall n m, ~ empty_relation n m.
+Proof.
+  unfold not. intros. inversion H.
+Qed.
+
+Lemma le_trans : forall n m o, m <= n -> n <= o -> m <= o.
+Proof.
+  intros. transitivity n. apply H. apply H0.
+Qed.
+
+Theorem O_le_n : forall n,
+  0 <= n.
+Proof.
+  intros. induction n.
+  - reflexivity.
+  - apply le_S. apply IHn.
+Qed.
+
+Theorem n_le_m__Sn_le_Sm : forall n m,
+  n <= m -> S n <= S m.
+Proof.
+  intros. induction H.
+  - apply le_n.
+  - apply le_S. apply IHle.
+Qed.
+
+Lemma Sn_le_m__n_le_m : forall n m,
+S n <= m -> n <= m.
+Proof.
+  intros. induction H.
+  - apply le_S. apply le_n.
+  - apply le_S. apply IHle.
+Qed. 
+
+Theorem Sn_le_Sm__n_le_m : forall n m,
+  S n <= S m -> n <= m.
+Proof.
+  intros. inversion H.
+  - apply le_n.
+  - apply Sn_le_m__n_le_m. apply H1.
+Qed.
+
+Lemma O_lt_Sn : forall n,
+  0 < S n.
+Proof.
+  intros. induction n.
+  - unfold lt. reflexivity.
+  - apply le_S. unfold lt in IHn. apply IHn.
+Qed.
+
+Lemma Sn_le_0_0 : forall n,
+  n <= 0 -> n = 0.
+Proof.
+  intros. inversion H. reflexivity.
+Qed.
+
+Lemma n_lt_m__Sn_lt_Sm (n m : nat) : n < m -> S n < S m.
+Proof.
+(* trivial. omit here. *)
+Admitted.
+
+Theorem ge_two_meanings : forall n m,
+  n <= m -> n < m \/ n = m.
+Proof.
+  intros n. induction n.
+  - intros. destruct m.
+    + right. reflexivity.
+    + left. apply O_lt_Sn.
+  - intros. destruct m.
+    + apply Sn_le_0_0 in H. right. apply H.
+    + apply Sn_le_Sm__n_le_m in H. apply IHn in H. destruct H.
+      * left. apply n_lt_m__Sn_lt_Sm. apply H.
+      * right. rewrite H. reflexivity.
+Qed.
+
+Theorem ge_two_meanings_strong : forall n m,
+  n <= m -> n < m \/ n >= m.
+Proof.
+  intros. apply ge_two_meanings in H.
+  destruct H.
+  * left. apply H.
+  * right. rewrite H. unfold ge. reflexivity.
+Qed.
+
+Theorem lt_ge_cases : forall n m,
+  n < m \/ n >= m.
+Proof.
+  intros. induction n.
+  - destruct m.
+    + right. unfold ge. reflexivity.
+    + left. apply O_lt_Sn.
+  - destruct m.
+    + right. unfold ge. apply O_le_n.
+    + destruct IHn.
+      * apply ge_two_meanings_strong. unfold lt in H. apply H.
+      * right. unfold ge. unfold ge in H.
+        apply Sn_le_m__n_le_m in H. apply n_le_m__Sn_le_Sm. apply H.
+Qed.
+
+Theorem le_plus_l : forall a b,
+  a <= a + b.
+Proof.
+  intros. induction b.
+  - rewrite add_0_r. reflexivity.
+  - rewrite plus_1_r. rewrite add_assoc. rewrite <- plus_1_r.
+    apply le_S. apply IHb.
+Qed.
+
+Theorem plus_le : forall n1 n2 m,
+  n1 + n2 <= m ->
+  n1 <= m /\ n2 <= m.
+Proof.
+  intros. split.
+  - induction n2.
+    + rewrite add_0_r in H. apply H.
+    + rewrite plus_1_r in H. rewrite add_assoc in H. rewrite <- plus_1_r in H.
+      apply Sn_le_m__n_le_m in H. apply IHn2 in H. apply H.
+  - induction n1.
+    + simpl in H. apply H.
+    + simpl in H. apply Sn_le_m__n_le_m in H. apply IHn1 in H. apply H.
+Qed.
+
+Theorem add_le_cases : forall n m p q,
+  n + m <= p + q -> n <= p \/ m <= q.
+Proof.  
+  intros n. induction n.
+  - intros. left. apply O_le_n.
+  - intros. destruct p.
+    + simpl in H. apply Sn_le_m__n_le_m in H. right. 
+      apply plus_le in H. destruct H as [_ H]. apply H.
+    + simpl in H. apply Sn_le_Sm__n_le_m in H. apply IHn in H.
+      destruct H.
+      * left. apply n_le_m__Sn_le_Sm in H. apply H.
+      * right. apply H.
+Qed.
+
+Theorem plus_le_compat_l : forall n m p,
+  n <= m ->
+  p + n <= p + m.
+Proof.
+  intros. induction p. generalize dependent n. generalize dependent m.
+  - simpl. intros. apply H.
+  - simpl. apply n_le_m__Sn_le_Sm in IHp. apply IHp.
+Qed.
+
+Theorem plus_le_compat_r : forall n m p,
+  n <= m ->
+  n + p <= m + p.
+Proof.
+  intros. induction p. generalize dependent n. generalize dependent m.
+  - intros. rewrite add_0_r. rewrite add_0_r. apply H.
+  - rewrite plus_1_r. rewrite (add_comm p 1). rewrite add_assoc. rewrite add_assoc.
+    replace (n + 1) with (S n). replace (m + 1) with (S m). simpl.
+    apply n_le_m__Sn_le_Sm in IHp. apply IHp.
+    apply plus_1_r. apply plus_1_r.
+Qed.
+
