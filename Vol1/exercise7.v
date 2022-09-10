@@ -432,3 +432,69 @@ Proof.
     apply plus_1_r. apply plus_1_r.
 Qed.
 
+Theorem le_plus_trans : forall n m p,
+  n <= m ->
+  n <= m + p.
+Proof.
+  intros. induction p.
+  - rewrite add_0_r. apply H.
+  - rewrite plus_1_r. rewrite add_assoc. rewrite <- plus_1_r.
+    apply le_S. apply IHp.
+Qed.
+
+Lemma Sn_lt_m__n_lt_m : forall n m,
+  S n < m -> n < m.
+Proof.
+  unfold lt. intros.
+  apply Sn_le_m__n_le_m. apply H.
+Qed.
+
+Theorem plus_lt : forall n1 n2 m,
+  n1 + n2 < m ->
+  n1 < m /\ n2 < m.
+Proof.
+  intros. split.
+  - induction n2.
+    + rewrite add_0_r in H. apply H.
+    + rewrite plus_1_r in H. rewrite add_assoc in H. rewrite <- plus_1_r in H.
+      apply Sn_lt_m__n_lt_m in H. apply IHn2 in H. apply H.
+  - induction n1.
+    + simpl in H. apply H.
+    + simpl in H. apply Sn_lt_m__n_lt_m in H. apply IHn1 in H. apply H.
+Qed.
+
+
+(** **** Exercise: 4 stars, standard, optional (more_le_exercises) *)
+Theorem leb_complete : forall n m,
+  n <=? m = true -> n <= m.
+Proof.
+  intros n. induction n.
+  - intros. apply O_le_n.
+  - intros. destruct m.
+    + inversion H.
+    + apply n_le_m__Sn_le_Sm. apply IHn. simpl in H. apply H.
+Qed.
+
+Theorem leb_correct : forall n m,
+  n <= m ->
+  n <=? m = true.
+Proof.
+  intros. generalize dependent n. induction m.
+  - intros. inversion H. reflexivity.
+  - destruct n.
+    + reflexivity.
+    + intros. apply Sn_le_Sm__n_le_m in H. apply IHm in H. simpl. apply H.
+Qed.
+
+Theorem leb_iff : forall n m,
+  n <=? m = true <-> n <= m.
+Proof.
+  intros. split. apply leb_complete. apply leb_correct.
+Qed.
+
+Theorem leb_true_trans : forall n m o,
+  n <=? m = true -> m <=? o = true -> n <=? o = true.
+Proof.
+  intros. rewrite leb_iff in H, H0. rewrite leb_iff.
+  transitivity m. apply H. apply H0.
+Qed.
