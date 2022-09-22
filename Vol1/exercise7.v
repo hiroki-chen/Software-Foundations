@@ -498,3 +498,99 @@ Proof.
   intros. rewrite leb_iff in H, H0. rewrite leb_iff.
   transitivity m. apply H. apply H0.
 Qed.
+
+(* R a b c <-> a + b = c. *)
+Inductive R : nat -> nat -> nat -> Prop :=
+  | c1 : R 0 0 0
+  | c2 m n o (H : R m n o ) : R (S m) n (S o)
+  | c3 m n o (H : R m n o ) : R m (S n) (S o)
+  | c4 m n o (H : R (S m) (S n) (S (S o))) : R m n o
+  | c5 m n o (H : R m n o ) : R n m o.
+
+Definition fR : nat -> nat -> nat :=
+  fun (a b : nat) => a + b.
+
+Lemma R_0_n_n : forall n,
+  R 0 n n.
+Proof.
+  intros. induction n.
+  - apply c1.
+  - apply c3. apply IHn.
+Qed.
+
+Lemma abc_R_abc : forall a b c,
+  a + b = c -> R a b c.
+Proof.
+  intros a. induction a.
+  - simpl. intros. rewrite H. apply R_0_n_n.
+  - intros. destruct c.
+    + inversion H.
+    + simpl in H. injection H. intros.
+      apply IHa in H0. apply c2. apply H0.
+Qed.
+
+Theorem R_equiv_fR : forall a b c, R a b c <-> fR a b = c.
+ Proof.
+  split; unfold fR.
+  - intros. induction H.
+    + trivial.
+    + simpl. rewrite IHR. trivial.
+    + rewrite <- plus_n_Sm. rewrite IHR. trivial.
+    + simpl in IHR. rewrite <- plus_n_Sm in IHR. injection IHR. trivial.
+    + rewrite add_comm. apply IHR.
+  - apply abc_R_abc.
+Qed.
+
+Inductive subseq : list nat -> list nat -> Prop :=
+  | empty: subseq [] []
+  | add_r l1 l2 n (H : subseq l1 l2): subseq l1 (n :: l2)
+  | add_both l1 l2 n (H : subseq l1 l2): subseq (n :: l1) (n :: l2).
+
+Lemma empty_subseq : forall l : list nat,
+  subseq [] l.
+Proof.
+  intros. induction l.
+  - apply empty.
+  - apply add_r. apply IHl.
+Qed.
+
+Lemma add_right_list : forall l1 l2 l3,
+  subseq l1 l2 -> subseq l1 (l2 ++ l3).
+Proof.
+  intros. induction H.
+  - simpl. apply empty_subseq.
+  - simpl. apply add_r. apply IHsubseq.
+  - simpl. apply add_both. apply IHsubseq.
+Qed.
+
+Theorem subseq_refl : forall (l : list nat), subseq l l.
+Proof.
+  intros.
+  induction l.
+  - apply empty.
+  - apply add_both. apply IHl.
+Qed.
+
+Theorem subseq_app : forall (l1 l2 l3 : list nat),
+  subseq l1 l2 ->
+  subseq l1 (l2 ++ l3).
+Proof.
+  destruct l1.
+  - intros. apply empty_subseq.
+  - intros. apply add_right_list. apply H.
+Qed.
+
+Theorem subseq_trans : forall l1 l2 l3,
+  subseq l1 l2 ->
+  subseq l2 l3 ->
+  subseq l1 l3.
+Proof.
+  intros l1 l2 l3 H1 H2. generalize dependent l1.
+  induction H2. (* We want to eliminate the middle one, so we do induction on it. *)
+  - auto.
+  - intros. apply add_r. apply IHsubseq. apply H1.
+  - intros. inversion H1.
+    + apply add_r. apply IHsubseq. apply H3.
+    + apply add_both. apply IHsubseq. apply H3.
+Qed.
+
