@@ -388,3 +388,115 @@ Proof.
       + apply E_Seq with (Y !-> 3 ; X !-> 1 ; Y !-> 2 ; Y !-> 0 ; X !-> 2); apply E_Asgn; trivial.
       + apply E_WhileFalse. trivial.
 Qed.
+
+Theorem ceval_deterministic : forall c st st1 st2,
+  st =[ c ]=> st1 ->
+  st =[ c ]=> st2 ->
+  st1 = st2.
+Proof.
+  intros c st st1 st2 E1 E2.
+  generalize dependent st2.
+  induction E1; intros; inversion E2; subst.
+  - trivial.
+  - trivial.
+  - apply IHE1_2. apply IHE1_1 in H1. subst. apply H4.
+  - apply IHE1. apply H6.
+  - rewrite H in H5. discriminate.
+  - rewrite H in H5. discriminate.
+  - apply IHE1. apply H6.
+  - trivial.
+  - rewrite H in H2. discriminate.
+  - rewrite H in H4. discriminate.
+  - apply IHE1_2. apply IHE1_1 in H3. rewrite H3. apply H6.
+Qed.
+
+Definition plus2 : com :=
+  <{ X := X + 2 }>.
+
+Theorem plus2_spec: forall st n st',
+  st X = n ->
+  st =[ plus2 ]=> st' ->
+  st' X = n + 2.
+Proof.
+  unfold plus2. intros. inversion H0. subst.
+  trivial.
+Qed.
+
+Definition XtimesYinZ : com :=
+  <{ Z := X * Y }>.
+
+Theorem XtimesYinZ_spec: forall st n1 n2 st',
+  st X = n1 ->
+  st Y = n2 ->
+  st =[ XtimesYinZ ]=> st' ->
+  st' Z = n1 * n2.
+Proof.
+  unfold XtimesYinZ. intros.
+  inversion H1. subst.
+  trivial.
+Qed.
+
+Definition loop : com :=
+  <{ while true do
+       skip
+     end }>.
+
+Theorem loop_never_stops : forall st st',
+  ~(st =[ loop ]=> st').
+Proof.
+  intros st st' contra. unfold loop in contra.
+  remember <{ while true do skip end }> as loopdef
+           eqn : Heqloopdef.
+  induction contra; try discriminate. 
+  - inversion Heqloopdef. rewrite H1 in H. discriminate.
+  - inversion Heqloopdef. subst. apply IHcontra2. apply Heqloopdef.
+Qed.
+
+Fixpoint no_whiles (c : com) : bool :=
+  match c with
+  | <{ skip }> =>
+      true
+  | <{ _ := _ }> =>
+      true
+  | <{ c1 ; c2 }> =>
+      andb (no_whiles c1) (no_whiles c2)
+  | <{ if _ then ct else cf end }> =>
+      andb (no_whiles ct) (no_whiles cf)
+  | <{ while _ do _ end }> =>
+      false
+  end.
+
+Inductive no_whilesR: com -> Prop :=
+  | R_skip : no_whilesR <{ skip }>
+  | R_asgn : forall lhs rhs, no_whilesR <{ lhs := rhs }>
+  | R_seq : forall c1 c2, no_whilesR c1 -> no_whilesR c2 -> no_whilesR <{ c1 ; c2 }>
+  | R_ifesle : forall exp c1 c2, no_whilesR c1 -> no_whilesR c2 -> no_whilesR <{ if exp then c1 else c2 end }>.
+
+Theorem no_whiles_eqv:
+  forall c, no_whiles c = true <-> no_whilesR c.
+Proof.
+  split; intros.
+  - induction c.
+    + apply R_skip.
+    + apply R_asgn.
+    + inversion H. apply andb_true_iff in H1. destruct H1. apply R_seq. apply IHc1. auto. apply IHc2. auto.
+    + inversion H. apply andb_true_iff in H1. destruct H1. apply R_ifesle. apply IHc1. auto. apply IHc2. auto.
+    + inversion H.
+  - induction H; auto; simpl; apply andb_true_iff; split; auto.
+Qed.
+
+Theorem no_whiles_terminating : forall st c,
+  no_whilesR c ->
+  exists st', st =[ c ]=> st'.
+Proof.
+  intros. (* There is no meaning introducing st. *)
+  generalize dependent st. induction H; intros.
+  - exists st. apply E_Skip.
+  - exists (lhs !-> aeval st rhs; st). apply E_Asgn. trivial.
+  - destruct IHno_whilesR1 with st. destruct IHno_whilesR2 with x. (* fix some existing state. *)
+    exists x0. apply E_Seq with x; auto.
+  - destruct IHno_whilesR1 with st. destruct IHno_whilesR2 with st.
+    destruct (beval st exp) eqn : H'. (* destruct condition. *)
+    + exists x. apply E_IfTrue. apply H'. apply H1.
+    + exists x0. apply E_IfFalse. apply H'. apply H2.
+Qed.
