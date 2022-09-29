@@ -500,3 +500,105 @@ Proof.
     + exists x. apply E_IfTrue. apply H'. apply H1.
     + exists x0. apply E_IfFalse. apply H'. apply H2.
 Qed.
+
+Inductive sinstr : Type :=
+| SPush (n : nat)
+| SLoad (x : string)
+| SPlus
+| SMinus
+| SMult.
+
+
+Fixpoint s_execute (st : state) (stack : list nat)
+                   (prog : list sinstr)
+                 : list nat :=
+  match prog with
+  | [] => stack
+  | cons inst l' =>
+      match inst with
+      | SPush n => s_execute (st) (n :: stack)  (l')
+      | SLoad x => s_execute (st) ((aeval st (AId x)) :: stack) (l')
+      | SPlus => 
+        match stack with
+        | n1 :: n2 :: l'' => s_execute (st) ((n2 + n1) :: l'') (l')
+        | _ => s_execute st stack l'
+        end
+      | SMinus => 
+        match stack with
+        | n1 :: n2 :: l'' => s_execute (st) ((n2 - n1) :: l'') (l')
+        | _ => s_execute st stack l'
+        end
+      | SMult =>
+        match stack with
+        | n1 :: n2 :: l'' => s_execute (st) ((n2 * n1) :: l'') (l')
+        | _ => s_execute st stack l'
+        end
+      end
+  end.
+
+Example s_execute1 :
+     s_execute empty_st []
+       [SPush 5; SPush 3; SPush 1; SMinus]
+   = [2; 5].
+Proof. trivial. Qed.
+
+Example s_execute2 :
+     s_execute (X !-> 3) [3;4]
+       [SPush 4; SLoad X; SMult; SPlus]
+   = [15; 4].
+Proof. trivial. Qed.
+
+Fixpoint s_compile (e : aexp) : list sinstr :=
+  match e with
+  | ANum n => [SPush n]
+  | AId x => [SLoad x]
+  | APlus exp1 exp2 => s_compile (exp1) ++ s_compile (exp2) ++ [SPlus]
+  | AMinus exp1 exp2 => s_compile (exp1) ++ s_compile (exp2) ++ [SMinus]
+  | AMult exp1 exp2 => s_compile (exp1) ++ s_compile (exp2) ++ [SMult]
+  end.
+
+Example s_compile1 :
+  s_compile <{ X - (2 * Y) }>
+  = [SLoad X; SPush 2; SLoad Y; SMult; SMinus].
+Proof. trivial. Qed.
+
+Theorem execute_app : forall st p1 p2 stack,
+  s_execute st stack (p1 ++ p2) = s_execute st (s_execute st stack p1) p2.
+Proof.
+  induction p1.
+  - trivial.
+  - induction a; intros.
+    + simpl. auto.
+    + simpl. auto.
+    + induction stack; simpl; auto; induction stack; simpl; auto.
+    + induction stack; simpl; auto; induction stack; simpl; auto.
+    + induction stack; simpl; auto; induction stack; simpl; auto.
+Qed.
+
+Lemma s_compile_correct_aux : forall st e stack,
+  s_execute st stack (s_compile e) = aeval st e :: stack.
+Proof.
+  induction e; trivial; intros; simpl;
+  try (rewrite app_assoc; repeat rewrite execute_app; rewrite IHe1; rewrite IHe2; trivial).
+Qed.
+
+Theorem s_compile_correct : forall (st : state) (e : aexp),
+  s_execute st [] (s_compile e) = [ aeval st e ].
+Proof.
+  intros. rewrite s_compile_correct_aux. trivial.
+Qed.
+
+Fixpoint beval_sc (st : state) (* <--- NEW *) (b : bexp) : bool :=
+  match b with
+  | <{b1 && b2}> => if negb (beval_sc st b1) then false else beval_sc st b2
+  | _ => beval st b
+  end.
+
+Theorem beval_sc_is_beval : forall st b,
+  beval st b = beval_sc st b.
+Proof.
+  induction b; trivial; simpl.
+  destruct (negb (beval_sc st b1)) eqn : H.
+  - apply negb_true_iff in H. rewrite H in IHb1. rewrite IHb1. trivial.
+  - apply negb_false_iff in H. rewrite H in IHb1. rewrite IHb1. trivial.
+Qed.
