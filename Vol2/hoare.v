@@ -238,3 +238,304 @@ Qed.
 
 Hint Unfold assert_implies hoare_triple assn_sub t_update : core.
 Hint Unfold assert_of_Prop Aexp_of_nat Aexp_of_aexp : core.
+
+Example hoare_asgn_example1' :
+  {{True}} X := 1 {{X = 1}}.
+Proof.
+  eapply hoare_consequence_pre.
+  - eapply hoare_asgn.
+  - auto.
+Qed.
+
+Example assn_sub_example2' :
+  {{X < 4}}
+    X := X + 1
+  {{X < 5}}.
+Proof.
+  eapply hoare_consequence_pre.
+  - apply hoare_asgn.
+  - unfold "->>", assn_sub, "!->".
+    intros. simpl in *. lia.
+Qed. 
+
+(* A custom tactic for dealing with assignment. *)
+Ltac assn_auto :=
+  try auto; (* as in example 1, above *)
+  try (unfold "->>", assn_sub, t_update;
+       intros; simpl in *; lia). (* as in example 2 *)
+
+Example assn_sub_ex1' :
+  {{ X <= 5 }}
+    X := 2 * X
+  {{ X <= 10 }}.
+Proof.
+  eapply hoare_consequence_pre.
+  - apply hoare_asgn.
+  - assn_auto.
+Qed.
+
+Example assn_sub_ex2' :
+  {{ 0 <= 3 /\ 3 <= 5 }}
+    X := 3
+  {{ 0 <= X /\ X <= 5 }}.
+Proof.
+  eapply hoare_consequence_pre.
+  - apply hoare_asgn.
+  - auto.
+Qed.
+
+Example hoare_asgn_example3 : forall (a : aexp) (n : nat),
+  {{a = n}}
+    X := a;
+    skip
+  {{X = n}}.
+Proof.
+  intros. eapply hoare_seq.
+  - apply hoare_skip.
+  - simpl. eapply hoare_consequence_pre.
+    + apply hoare_asgn.
+    + auto.
+Qed.
+
+Example hoare_asgn_example4 :
+  {{ True }}
+    X := 1;
+    Y := 2
+  {{ X = 1 /\ Y = 2 }}.
+Proof.
+  apply hoare_seq with (Q := (X = 1)%assertion);
+  (* The annotation %assertion is needed here to help Coq parse correctly. *)
+  simpl; eapply hoare_consequence_pre; try apply hoare_asgn; auto.
+Qed.
+
+Definition swap_program : com :=
+  <{
+    Z := X ;
+    X := Y ;
+    Y := Z
+  }>.
+
+Theorem swap_exercise :
+  {{X <= Y}}
+    swap_program
+  {{Y <= X}}.
+Proof.
+  unfold swap_program.
+  eapply hoare_seq.
+  - simpl. eapply hoare_seq; apply hoare_asgn.
+  - simpl. eapply hoare_consequence_pre.
+    + apply hoare_asgn.
+    + auto.
+Qed.
+
+(* Note that a is an arithmetic expression, so it can contain the identifier X.
+   The key point is that X is modified.
+*)
+Theorem invalid_triple : ~ (
+  forall (a : aexp) (n : nat),
+  {{ a = n }}
+    X := 3;
+    Y := a
+  {{ Y = n }}
+).
+Proof.
+(* The thing is, if we follow the rule in the assumption, we have a conclusion that is
+contradictory to the correct rule of inference. *)
+  unfold hoare_triple, not. intros.
+  specialize H with (a := X) (n := 1). simpl in H.
+  (* Use the evaluation rules (E_Seq and E_Asgn) to show that Y has a different value y2 
+  in the same final state st' *)
+  assert (H': (X !-> 1) =[ X := 3; Y := X ]=> (Y !-> 3; X !-> 3; X !-> 1)).
+  - eapply E_Seq. apply E_Asgn. auto.
+    apply E_Asgn. trivial.
+
+  (* Use the (assumed) validity of the given hoare triple to derive a state st' in which Y has 
+  some value y1 *)
+  - assert (H'' : 3 = 1).
+    apply H in H'. apply H'. auto.
+  
+  discriminate H''.
+Qed.
+
+Definition bassn b : Assertion :=
+  fun st => (beval st b = true).
+
+Coercion bassn : bexp >-> Assertion.
+Arguments bassn /.
+
+Lemma bexp_eval_false : forall b st,
+  beval st b = false -> ~ ((bassn b) st).
+Proof.
+  (* In fact, we can use congruence. *)
+  intros. unfold not.
+  induction b; simpl in *; intros; try rewrite H in H0; discriminate.
+Qed.
+
+Hint Resolve bexp_eval_false : core.
+
+Theorem hoare_if : forall P Q (b : bexp) c1 c2,
+  {{ P /\ b }} c1 {{ Q }} ->
+  {{ P /\ ~b }} c2 {{ Q }} ->
+  {{ P }} if b then c1 else c2 end {{ Q }}.
+Proof.
+  unfold hoare_triple. intros.
+  inversion H1; subst; eauto.
+Qed.
+
+Ltac assn_auto' :=
+  unfold "->>", assn_sub, t_update, bassn;
+  intros; simpl in *;
+  try rewrite -> eqb_eq in *; (* for equalities *)
+  auto; try lia.
+
+Example if_example'' :
+  {{True}}
+    if X = 0
+      then Y := 2
+      else Y := X + 1
+    end
+  {{X <= Y}}.
+Proof.
+  eapply hoare_if; eapply hoare_consequence_pre; try apply hoare_asgn; assn_auto'.
+Qed.
+
+(* For later proofs, it will help to extend assn_auto' to handle inequalities, too. *)
+Ltac assn_auto'' :=
+  unfold "->>", assn_sub, t_update, bassn;
+  intros; simpl in *;
+  try rewrite -> eqb_eq in *;
+  try rewrite -> leb_le in *; (* for inequalities *)
+  auto; try lia.
+
+Theorem if_minus_plus :
+  {{True}}
+    if (X <= Y)
+      then Z := Y - X
+      else Y := X + Z
+    end
+  {{ Y = X + Z }}.
+Proof.
+  eapply hoare_if; eapply hoare_consequence_pre; try apply hoare_asgn; assn_auto''.
+Qed.
+
+Module If1.
+
+Inductive com : Type :=
+  | CSkip : com
+  | CAsgn : string -> aexp -> com
+  | CSeq : com -> com -> com
+  | CIf : bexp -> com -> com -> com
+  | CWhile : bexp -> com -> com
+  | CIf1 : bexp -> com -> com.
+
+Notation "'if1' x 'then' y 'end'" :=
+         (CIf1 x y)
+         (in custom com at level 0, x custom com at level 99).
+Notation "'skip'" :=
+         CSkip 
+         (in custom com at level 0).
+Notation "x := y" :=
+         (CAsgn x y)
+         (in custom com at level 0, x constr at level 0, y at level 85, no associativity).
+Notation "x ; y" :=
+         (CSeq x y)
+         (in custom com at level 90, right associativity).
+Notation "'if' x 'then' y 'else' z 'end'" :=
+         (CIf x y z)
+         (in custom com at level 89, x at level 99, y at level 99, z at level 99).
+Notation "'while' x 'do' y 'end'" :=
+         (CWhile x y)
+         (in custom com at level 89, x at level 99, y at level 99).
+
+Reserved Notation "st '=[' c ']=>' st'"
+         (at level 40, c custom com at level 99, st constr, st' constr at next level).
+Inductive ceval : com -> state -> state -> Prop :=
+  | E_Skip : forall st,
+      st =[ skip ]=> st
+  | E_Asgn : forall st a1 n x,
+      aeval st a1 = n ->
+      st =[ x := a1 ]=> (x !-> n ; st)
+  | E_Seq : forall c1 c2 st st' st'',
+      st =[ c1 ]=> st' ->
+      st' =[ c2 ]=> st'' ->
+      st =[ c1 ; c2 ]=> st''
+  | E_IfTrue : forall st st' b c1 c2,
+      beval st b = true ->
+      st =[ c1 ]=> st' ->
+      st =[ if b then c1 else c2 end ]=> st'
+  | E_IfFalse : forall st st' b c1 c2,
+      beval st b = false ->
+      st =[ c2 ]=> st' ->
+      st =[ if b then c1 else c2 end ]=> st'
+  | E_WhileFalse : forall b st c,
+      beval st b = false ->
+      st =[ while b do c end ]=> st
+  | E_WhileTrue : forall st st' st'' b c,
+      beval st b = true ->
+      st =[ c ]=> st' ->
+      st' =[ while b do c end ]=> st'' ->
+      st =[ while b do c end ]=> st''
+  | E_If1True : forall st st' b c,
+      beval st b = true ->
+      st =[ c ]=> st' ->
+      st =[ if1 b then c end ]=> st'
+  | E_If1False : forall st b c,
+      beval st b = false ->
+      st =[ if1 b then c end ]=> st
+  where "st =[ c ]=> st'" := (ceval c st st').
+
+Hint Constructors ceval : core.
+
+Example if1true_test : empty_st =[ if1 X = 0 then X := 1 end ]=> (X !-> 1).
+Proof. eauto. Qed.
+
+Example if1false_test : (X !-> 2) =[ if1 X = 0 then X := 1 end ]=> (X !-> 2).
+Proof. eauto. Qed.
+
+Definition hoare_triple (P : Assertion) (c : com) (Q : Assertion) : Prop :=
+  forall st st', st =[ c ]=> st' -> P st -> Q st'.
+Hint Unfold hoare_triple : core.
+
+Notation "{{ P }} c {{ Q }}" := (hoare_triple P c Q)
+                                (at level 90, c custom com at level 99)
+                                : hoare_spec_scope.
+
+Theorem hoare_if1: forall P Q (b:bexp) c,
+  {{ P /\ b }} c {{Q}} ->
+  (P /\ ~b)%assertion ->> Q ->
+  {{P}} if1 b then c end {{Q}}.
+Proof.
+  unfold hoare_triple. intros. inversion H1. subst.
+  - eauto.
+  - subst. apply H0. split. apply H2. congruence.
+Qed.
+
+Theorem hoare_consequence_pre : forall (P P' Q : Assertion) c,
+  {{P'}} c {{Q}} ->
+  P ->> P' ->
+  {{P}} c {{Q}}.
+Proof.
+  eauto.
+Qed.
+Theorem hoare_asgn : forall Q X a,
+  {{Q [X |-> a]}} (X := a) {{Q}}.
+Proof.
+  intros Q X a st st' Heval HQ.
+  inversion Heval; subst.
+  auto.
+Qed.
+
+Example hoare_if1_good: 
+  {{ X + Y = Z }}
+  if1 ~(Y = 0) then
+    X := X + Y
+  end
+  {{ X = Z }}.
+Proof.
+  apply hoare_if1; simpl.
+  - eapply hoare_consequence_pre. apply hoare_asgn. assn_auto.
+  - assn_auto''. destruct H. apply eq_true_negb_classical in H0. apply beq_nat_true in H0.
+    rewrite H0 in H. rewrite plus_0_r in H. auto.
+Qed.
+
+End If1.
