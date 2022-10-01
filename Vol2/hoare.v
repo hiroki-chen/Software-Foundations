@@ -539,3 +539,41 @@ Proof.
 Qed.
 
 End If1.
+
+Theorem hoare_while : forall P (b:bexp) c,
+  {{P /\ b}} c {{P}} ->
+  {{P}} while b do c end {{P /\ ~ b}}.
+Proof.
+  unfold hoare_triple. intros.
+  (* We proceed by induction on Heval, because, in the "keep looping" case,
+     its hypotheses talk about the whole loop instead of just c. The
+     remember is used to keep the original command in the hypotheses;
+     otherwise, it would be lost in the induction. By using inversion
+     we clear away all the cases except those involving while. *)
+  remember <{while b do c end}> as c' eqn : H'.
+  induction H0; try inversion H'; subst; eauto.
+Qed.
+
+Example while_example :
+  {{X <= 3}}
+    while (X <= 2) do
+      X := X + 1
+    end
+  {{X = 3}}.
+Proof.
+  eapply hoare_consequence_post.
+  - simpl. apply hoare_while. 
+    eapply hoare_consequence_pre.
+    + apply hoare_asgn.
+    + assn_auto''.
+  - assn_auto''.
+Qed.
+
+Theorem always_loop_hoare : forall Q,
+  {{True}} while true do skip end {{Q}}.
+Proof.
+  intros.
+  eapply hoare_consequence_post.
+  - apply hoare_while. auto.
+  - assn_auto''.
+Qed.
