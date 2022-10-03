@@ -504,3 +504,175 @@ Proof.
     + apply H1. rewrite eqb_eq in H0. auto.
     + apply H2. rewrite eqb_eq in H0. auto.
 Qed.
+
+Definition two_loops_dec (a b c : nat) : decorated :=
+  <{
+    {{ True }} ->>
+    {{ c = 0 + 0 + c }}
+      X := 0
+                   {{ c = X + 0 + c }};
+      Y := 0
+                   {{ c = X + Y + c  }};
+      Z := c
+                   {{ Z = X + Y + c }};
+      while X <> a do
+                   {{ X <> a /\ Z = X + Y + c }} ->>
+                   {{ Z + 1 = 1 + X + Y + c }}
+        X := 1 + X
+                   {{ Z + 1 = X + Y + c }};
+        Z := Z + 1
+                   {{ Z = X + Y + c }}
+      end
+                   {{ X = a /\ Z = X + Y + c }} ->>
+                   {{ Z = a + Y + c }};
+      while Y <> b do
+                   {{ Y <> b /\ Z = a + Y + c }} ->>
+                   {{ Z + 1 = a + Y + 1 + c }}
+        Y := Y + 1
+                   {{ Z + 1 = a + Y + c }};
+        Z := Z + 1
+                   {{ Z = a + Y + c }}
+      end
+    {{ Y = b /\ Z = a + Y + c }} ->>
+    {{ Z = a + b + c }}
+  }>.
+
+Theorem two_loops_dec_correct : forall a b c,
+  outer_triple_valid (two_loops_dec a b c).
+Proof. verify. Qed.
+
+Fixpoint pow2 n :=
+  match n with
+  | 0 => 1
+  | S n' => 2 * (pow2 n')
+  end.
+
+(* Y = pow2 (1 + X) - 1 *)
+Definition dpow2_dec (n : nat) :=
+  <{
+    {{ True }} ->>
+    {{ 1 = pow2 1 - 1 /\ 1 = pow2 0}}
+      X := 0
+               {{ 1 = ap pow2 (1 + X) - 1 /\ 1 = ap pow2 X}};
+      Y := 1
+               {{ Y = ap pow2 (1 + X) - 1 /\ 1 = ap pow2 X}};
+      Z := 1
+               {{ Y = ap pow2 (1 + X) - 1 /\ Z = ap pow2 X}};
+      while X <> n do
+               {{ X <> n /\ Y = ap pow2 (1 + X) - 1 /\ Z = ap pow2 X }} ->>
+               {{ Y + 2 * Z = ap pow2 (1 + X + 1) - 1 /\ 2 * Z = ap pow2 (1 + X) }}
+        Z := 2 * Z
+               {{ Y + Z = ap pow2 (1 + X + 1) - 1 /\ Z = ap pow2 (1 + X)}};
+        Y := Y + Z
+               {{ Y = ap pow2 (1 + X + 1) - 1 /\ Z = ap pow2 (1 + X)}};
+        X := 1 + X
+               {{ Y = ap pow2 (1 + X) - 1 /\ Z = ap pow2 X}}
+      end
+    {{ X = n /\ Y = ap pow2 (1 + X) - 1 /\ Z = ap pow2 X }} ->>
+    {{ Y = pow2 (n + 1) - 1 /\ Z = ap pow2 n }}
+  }>.
+
+Lemma pow2_add_fact: forall n,
+  pow2 n + pow2 n = pow2 (n + 1).
+Proof.
+  induction n.
+  - trivial.
+  - simpl. repeat rewrite plus_0_r. repeat rewrite add_1_r. rewrite IHn.
+    rewrite add_1_r. trivial.
+Qed.
+
+Theorem dpow2_dec_correct : forall n,
+  outer_triple_valid (dpow2_dec n).
+Proof.
+  verify; remember (st X) as x.
+  - rewrite plus_0_r. 
+    rewrite pow2_add_fact.
+    (* eliminate _ - 1. *)
+    replace (pow2 (1 + X + 1)) with (pow2 (1 + X) + pow2 (1 + X)); remember (pow2 (1 + X)) as x'.
+    + induction x'. trivial. simpl. repeat rewrite sub_0_r. trivial.
+    + rewrite Heqx'. apply pow2_add_fact.
+  - rewrite plus_0_r. apply pow2_add_fact.
+Qed.
+
+(* Weakest precondition *)
+Definition is_wp P c Q :=
+  {{P}} c {{Q}} /\
+  forall P', {{P'}} c {{Q}} -> (P' ->> P).
+
+Theorem is_wp_example :
+  is_wp (Y <= 4) <{X := Y + 1}> (X <= 5).
+Proof.
+  unfold is_wp, hoare_triple. split; intros; simpl in *.
+  - inversion H. subst. unfold "!->". simpl. lia.
+  - unfold "->>". intros.
+    assert (H': (X !-> st Y + 1; st) X <= 5).
+    + unfold "!->". simpl. apply (H st (X !-> st Y + 1 ; st)). (* st' = X !-> st Y + 1 ; st *)
+      constructor. auto. auto.
+    + unfold "!->" in H'. simpl in *. lia.
+Qed.
+
+Theorem hoare_asgn_weakest : forall Q X a,
+  is_wp (Q [X |-> a]) <{ X := a }> Q.
+Proof.
+  unfold is_wp. split; intros; simpl in *.
+  - apply hoare_asgn.
+  - unfold "->>". intros. unfold hoare_triple in *. apply H with st.
+    + constructor. auto.
+    + auto.
+Qed.
+
+Fixpoint fib n :=
+  match n with
+  | 0 => 1
+  | S n' => match n' with
+            | 0 => 1
+            | S n'' => fib n' + fib n''
+            end
+  end.
+
+Lemma fib_eqn : forall n,
+  n > 0 ->
+  fib n + fib (pred n) = fib (1 + n).
+Proof.
+  intros. destruct n.
+  - lia.
+  - rewrite pred_succ. rewrite add_succ_r. trivial.
+Qed.
+
+Definition T : string := "T".
+(* T is used to backup the old value of Z. *)
+(* Do not forget to introduce the predicate n > 0. *)
+Definition dfib (n : nat) : decorated :=
+  <{
+    {{ True }} ->>
+    {{ 1 > 0 /\ 1 = (ap fib (1 - 1)) /\ 1 = (ap fib 1) }}
+    X := 1
+                {{ X > 0 /\ 1 = (ap fib (X - 1)) /\1 = (ap fib X) }} ;
+    Y := 1
+                {{ X > 0 /\ Y = (ap fib (X - 1)) /\ 1 = (ap fib X) }} ;
+    Z := 1
+                {{ X > 0 /\ Y = (ap fib (X - 1)) /\ Z = (ap fib X) }} ;
+    while X <> 1 + n do
+                  {{ X <> 1 + n /\ X > 0 /\ Y = (ap fib (X - 1)) /\ Z = (ap fib X) }} ->>
+                  {{ 1 + X > 0 /\ Z = (ap fib X) /\ Z + Y = (ap fib (1 + X)) }}
+      T := Z
+                  {{ 1 + X > 0 /\ T = (ap fib X) /\ Z + Y = (ap fib (1 + X)) }};
+      Z := Z + Y
+                  {{ 1 + X > 0 /\ T = (ap fib X) /\ Z = (ap fib (1 + X)) }};
+      Y := T
+                  {{ 1 + X > 0 /\ Y = (ap fib X) /\ Z = (ap fib (1 + X)) }};
+      X := 1 + X
+                  {{ X > 0 /\ Y = (ap fib (X - 1)) /\ Z = (ap fib X) }}
+    end
+    {{ X = 1 + n /\ X > 0 /\ Y = (ap fib (X - 1)) /\ Z = (ap fib X) }} ->>
+    {{ Y = fib n }}
+   }>.
+
+Theorem dfib_correct : forall n,
+  outer_triple_valid (dfib n).
+Proof.
+  verify.
+  - rewrite sub_1_r; try rewrite fib_eqn; auto.
+  - rewrite sub_0_r. trivial.
+  - rewrite sub_1_r. rewrite pred_succ. trivial.
+Qed.
