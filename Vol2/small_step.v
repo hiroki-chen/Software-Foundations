@@ -438,4 +438,85 @@ Proof.
            apply multistep_congr_2. constructor. auto.
            apply multi_R. constructor.
 Qed.
-      
+
+Lemma step__eval : forall t t' n,
+     t --> t' ->
+     t' ==> n ->
+     t ==> n.
+Proof.
+  intros t t' n Hs. generalize dependent n.
+  induction Hs; intros.
+  - inversion H. constructor; constructor.
+  - inversion H. subst. apply IHHs in H2.
+    constructor; auto.
+  - inversion H0. subst. apply IHHs in H5.
+    constructor; auto.
+Qed.
+
+Theorem multistep__eval : forall t t',
+  normal_form_of t t' -> exists n, t' = C n /\ t ==> n.
+Proof.
+  induction t; intros; unfold normal_form_of in *; destruct H.
+  - exists n. split.
+    + inversion H; subst; auto; try inversion H1.
+    + constructor.
+  - assert (G : exists n1, t1 ==> n1).
+    + (* We have to craft forall t' : tm, t1 -->* t' /\ step_normal_form t' *)
+      (* Accidentally, we have step_normal_form -> normalizing -> 
+         t1 -->* t' /\ step_normal_form t'. *)
+
+      destruct (step_normalizing t1).
+      Check step_normalizing.
+      Check normalizing.
+      apply IHt1 in H1. destruct H1. exists x0. destruct H1. auto.
+    + assert (G' : exists n2, t2 ==> n2).
+      (* step is normalizing, so this must be true. *)
+      * destruct (step_normalizing t2).
+        apply IHt2 in H1. destruct H1. exists x0. destruct H1. auto.
+      * destruct G, G'. exists (x + x0).
+        split. apply eval__multistep in H1, H2.
+
+        (* Transitivities. *)
+        assert (S: P t1 t2 -->* P (C x) t2).
+        apply multistep_congr_1. auto.
+
+        assert (S': P (C x) t2 -->* P (C x) (C x0)).
+        apply multistep_congr_2. constructor. auto.
+
+        assert (S'': P (t1) (t2) -->* P(C x) (C x0)).
+        apply multi_trans with (P (C x) t2); auto.
+
+        assert (S''': P (t1) (t2) -->* C (x + x0)).
+        eapply multi_trans. eauto. apply multi_R. constructor.
+        
+        assert (S'''': t' = C (x + x0)).
+        (* H: P t1 t2 -->* t'
+           H0: step_normal_form t' *)
+        apply (normal_forms_unique (P t1 t2)).
+        unfold normal_form_of. split; auto.
+        unfold normal_form_of. split; auto.
+        unfold step_normal_form, normal_form. unfold not. intros.
+        destruct H3. inversion H3. auto.
+
+        constructor; auto.
+Qed.
+
+Fixpoint evalF (t : tm) : nat :=
+  match t with
+  | C n => n
+  | P t1 t2 => evalF t1 + evalF t2
+  end.
+
+Theorem evalF_eval : forall t n,
+  evalF t = n <-> t ==> n.
+Proof.
+  induction t; split; intros.
+  - induction H. simpl. constructor.
+  - inversion H. subst. trivial.
+  - simpl in H. rewrite <- H.
+    constructor. 
+    + apply IHt1. trivial.
+    + apply IHt2. trivial.
+  - simpl. inversion H. subst.
+    apply IHt1 in H2. apply IHt2 in H4. subst. trivial.
+Qed.
