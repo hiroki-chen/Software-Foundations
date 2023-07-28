@@ -834,3 +834,49 @@ Proof.
   rewrite t_update_neq. assumption. intro X; inversion X.
 Qed.
 
+Definition stack := list nat.
+Definition prog := list sinstr.
+
+Inductive stack_step (st: state) : prog * stack -> prog * stack -> Prop :=
+  | SS_Push: forall stk n p,
+    stack_step st (SPush n :: p, stk) (p, n :: stk)
+  | SS_Load: forall stk i p,
+    stack_step st (SLoad i :: p, stk) (p, st i :: stk)
+  | SS_Plus: forall stk n m p,
+    stack_step st (SPlus :: p, n :: m :: stk) (p, (m + n) :: stk)
+  | SS_Minus: forall stk n m p,
+    stack_step st (SMinus :: p, n :: m :: stk) (p, (m - n) :: stk)
+  | SS_Mult: forall stk n m p,
+    stack_step st (SMult :: p, n :: m :: stk) (p, (n * m) :: stk).
+
+Theorem stack_step_deterministic: forall st,
+  deterministic (stack_step st).
+Proof.
+  unfold deterministic. intros st x y1 y2 H.
+  induction H; intros; inversion H; auto.
+Qed.
+
+Definition stack_multistep st := multi (stack_step st).
+
+Fixpoint s_compile (e : aexp) : list sinstr :=
+  match e with
+  | APlus a1 a2 => s_compile(a1) ++ s_compile(a2) ++ [SPlus]
+  | AMinus a1 a2 => s_compile(a2) ++ s_compile(a1) ++ [SMinus]
+  | AMult a1 a2 => s_compile(a1) ++ s_compile(a2) ++ [SMult]
+  | ANum n => [SPush n]
+  | AId x => [SLoad x]
+  end.
+
+(* s_compile e => prog; [] => empty stack as initial state. *)
+(* s_compile e, [] ===multi_step===> [], [aeval st e] *)
+Definition compiler_is_correct_statement : Prop :=
+  forall e st prog, stack_multistep st (s_compile e ++ prog, []) (prog, [aeval st e]).
+
+Theorem compiler_is_correct: compiler_is_correct_statement.
+Proof.
+  unfold compiler_is_correct_statement, stack_multistep. intros e.
+  induction e; intros; simpl in *.
+  - eapply multi_step. apply SS_Push. constructor.
+  - eapply multi_step. apply SS_Load. constructor.
+  - replace ((s_compile e1 ++ s_compile e2 ++ [SPlus]) ++ prog0) with (s_compile e1 ++ (s_compile e2 ++ [SPlus] ++ prog0)). repeat rewrite app_assoc.
+Abort.
