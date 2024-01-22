@@ -82,3 +82,6 @@ open import Data.Nat using (ℕ; zero; suc; _+_; _*_; _∸_;_^_)
   ≡⟨⟩
     suc n + m
   ∎
+
+_⇆_ : {A : Set} {a b c : A} → a ≡ b → b ≡ c → a ≡ c 
+_⇆_ refl refl = refl
