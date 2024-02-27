@@ -2,26 +2,21 @@ module typing where
 
 open import Data.Nat using (ℕ; zero; suc)
 open import Data.String using (String)
+open import Data.Product using (_×_; _,_)
 
 data τ : Set where
   nat : τ
   arr : τ → τ → τ
 
-data Term : Set where
-  var : String → Term
-  abs : String → Term → Term
-  app : Term → Term → Term
+data Term* : Set where
+  var : String → Term*
+  abs : String → Term* → Term*
+  app : Term* → Term* → Term*
   -- This is fix f x . e
-  fixp : String → String → Term → Term
-  num : ℕ → Term
-  _⊕_ : Term → Term → Term
-  ifelse : Term → Term → Term → Term
-  
-data Value : Set where
-  vnum : ℕ → Value
-  vabs : String → Term → Value
-  vfix : Term → Term → Term → Value
-  verror : Value
+  fixp : String → String → Term* → Term*
+  num : ℕ → Term*
+  _⊕_ : Term* → Term* → Term*
+  ifelse : Term* → Term* → Term* → Term*
 
 data env : Set where
   ⊥ : env
@@ -35,7 +30,7 @@ variable
   Γ : env
 
 infixl 20 _⊢_::_
-data _⊢_::_ : env → Term → τ → Set where
+data _⊢_::_ : env → Term* → τ → Set where
   tvar : ∀ {x τ} → x ∈ Γ → Γ ⊢ var x :: τ
   tnat : ∀ {n} → Γ ⊢ num n :: nat
   tbin : ∀ {t₁ t₂} → Γ ⊢ t₁ :: nat → Γ ⊢ t₂ :: nat → Γ ⊢ t₁ ⊕ t₂ :: nat
@@ -56,7 +51,7 @@ data _⊢_::_ : env → Term → τ → Set where
           -------------------
           Γ ⊢ fixp f x e :: arr τ₁ τ₂
 
-sample_expr : Term
+sample_expr : Term*
 sample_expr = fixp "f" "x" (ifelse (var "x") (num 0) (app (var "f") (var "x")))
 
 expr_type : Γ ⊢ sample_expr :: arr nat nat
@@ -70,19 +65,3 @@ expr_type = tfix (tifelse (tvar (there here)) tnat
 -- 2. If ⊢ e : τ and eval e = v, then v is a Value or there exists e' such that e → e'.
 
 -- We will prove this by induction on the typing relation.
-
-infixl 20 _->*_
-data eenv : Set where
-  ⊥ᵉ : eenv
-  eextend : String → Value → eenv → eenv
-variable
-  Σ : eenv
-
-data _∈ᵉ_>_ : String → eenv → Value → Set where
-  ehere : ∀ {x v Σ} → x ∈ᵉ eextend x v Σ > v
-  ethere : ∀ {x y v Σ} → x ∈ᵉ Σ > v → x ∈ᵉ eextend y v Σ > v
-
-data _->*_ : Term → Value → Set where
-  e_num : ∀ {n} → num n ->* vnum n
-  e_var : ∀ {x v} → x ∈ᵉ Σ > v → var x ->* v
-  e_abs : ∀ {x t} → abs x t ->* vabs x t
